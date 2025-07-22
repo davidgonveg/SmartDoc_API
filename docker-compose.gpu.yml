@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Ollama with GPU support
+  ollama:
+    image: ollama/ollama:latest
+    container_name: smartdoc-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # Agent API with GPU-optimized settings
+  agent-api:
+    environment:
+      - USE_GPU=true
+      - OLLAMA_HOST=ollama
+      - EMBEDDING_DEVICE=cuda
+    depends_on:
+      - ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  ollama_models:

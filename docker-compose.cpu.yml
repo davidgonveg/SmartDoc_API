@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  agent-api:
+    environment:
+      - USE_GPU=false
+      - OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
+      - EMBEDDING_DEVICE=cpu
+      - USE_API_FALLBACK=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
