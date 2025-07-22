@@ -57,3 +57,14 @@ docker-compose build
 # Development mode
 docker-compose up --build
 ```
+
+## í¾® GPU Environment Notes
+
+### GPU Setup Status
+- [ ] Docker GPU access configured
+- [ ] Ollama with GPU support tested
+- [ ] Larger models (Llama3.1 8B) downloaded
+- [ ] Performance benchmarks completed
+
+### GPU vs CPU Performance Comparison
+TBD after GPU environment setup
