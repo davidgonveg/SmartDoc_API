@@ -1,0 +1,1 @@
+"""SmartDoc Agent API Application"""

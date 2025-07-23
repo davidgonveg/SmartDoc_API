@@ -1,20 +1,4 @@
 # ===============================================
-# agent-api/app/agents/core/__init__.py  
-# ===============================================
-"""
-SmartDoc Core Agents Module
-Implementaciones principales de agentes
-"""
-
-from .smart_agent import SmartDocAgent, create_smartdoc_agent, ResearchSession
-
-__all__ = [
-    "SmartDocAgent",
-    "create_smartdoc_agent",
-    "ResearchSession"
-]
-
-# ===============================================
 # agent-api/app/agents/prompts/__init__.py
 # ===============================================
 """
