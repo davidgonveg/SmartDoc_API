@@ -48,6 +48,7 @@ plotly==5.17.0
 # Optional GPU support
 torch>=2.0.0; sys_platform != "darwin"
 torchvision>=0.15.0; sys_platform != "darwin"
+transformers>=4.35.0
 
 # Development
 pytest==7.4.3
