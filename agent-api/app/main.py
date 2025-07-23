@@ -1,5 +1,5 @@
 """
-SmartDoc Agent API - Versión Mínima Funcional
+SmartDoc Agent API - Versión con Ollama Client
 """
 
 from fastapi import FastAPI, HTTPException
@@ -65,13 +65,59 @@ async def health_check():
         "version": "0.1.0"
     }
 
+@app.get("/test-ollama")
+async def test_ollama_connection():
+    """Test endpoint para verificar conexión Ollama"""
+    try:
+        from app.services.ollama_client import get_ollama_client
+        
+        client = await get_ollama_client()
+        is_healthy = await client.health_check()
+        
+        if is_healthy:
+            # Test basic generation
+            result = await client.generate(
+                model="llama3.2:3b", 
+                prompt="Say hello in one sentence.",
+                options={"num_predict": 50}
+            )
+            
+            if result["success"]:
+                return {
+                    "status": "connected",
+                    "ollama_healthy": True,
+                    "model_test": "success",
+                    "test_response": result["response"],
+                    "model_used": result.get("model", "unknown")
+                }
+            else:
+                return {
+                    "status": "connected_but_generation_failed",
+                    "ollama_healthy": True,
+                    "model_test": "failed",
+                    "error": result.get("error", "Unknown error")
+                }
+        else:
+            return {
+                "status": "connection_failed",
+                "ollama_healthy": False,
+                "error": "Ollama health check failed"
+            }
+            
+    except Exception as e:
+        logger.error(f"Ollama test failed: {e}")
+        return {
+            "status": "error",
+            "ollama_healthy": False,
+            "error": str(e)
+        }
+
 @app.post("/research/session")
 async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
     """Create research session"""
     try:
         session_id = str(uuid.uuid4())
         
-        # Guardar sesión
         active_sessions[session_id] = {
             "topic": request.topic,
             "objectives": request.objectives,
@@ -85,7 +131,7 @@ async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
             "session_id": session_id,
             "status": "created",
             "topic": request.topic,
-            "message": "Sesión creada exitosamente (versión básica)"
+            "message": "Sesión creada exitosamente"
         }
         
     except Exception as e:
@@ -96,16 +142,14 @@ async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
 async def chat_with_agent(session_id: str, message: ChatMessage) -> Dict[str, Any]:
     """Chat with research agent"""
     try:
-        # Verificar que la sesión existe
         if session_id not in active_sessions:
             raise HTTPException(status_code=404, detail="Sesión no encontrada")
         
         session = active_sessions[session_id]
         
-        # Simular respuesta del agente
-        response = f"Hola! Recibí tu mensaje: '{message.message}'. Soy el agente de SmartDoc en versión básica. El tópico de tu sesión es: {session['topic']}"
+        # Por ahora, respuesta simulada
+        response = f"Hola! Recibí tu mensaje: '{message.message}'. Soy el agente de SmartDoc. El tópico de tu sesión es: {session['topic']}"
         
-        # Guardar mensaje en la sesión
         session["messages"].append({
             "user": message.message,
             "agent": response
