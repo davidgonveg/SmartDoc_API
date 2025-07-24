@@ -665,3 +665,10 @@ __all__ = [
     "get_mock_html_for_domain",
     "create_mock_agent_session"
 ]
+
+
+
+# Missing exports
+MOCK_RESEARCH_SESSIONS = []
+MOCK_SEARCH_RESULTS = []
+

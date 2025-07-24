@@ -207,4 +207,4 @@ class UnitTestHelpers:
         return mock_tool
     
     @staticmethod
-    def assert_mock_called_with_partial(mock
+    def assert_mock_called_with_partial(mock):
