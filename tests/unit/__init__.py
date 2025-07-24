@@ -1,30 +1,24 @@
 """
 SmartDoc Research Agent - Unit Tests Package
 
-Este paquete contiene todos los tests unitarios para los componentes individuales
-del agente de investigación SmartDoc.
+Este paquete contiene tests unitarios para el agente de investigación SmartDoc.
+Los tests unitarios se enfocan en probar componentes individuales de forma aislada.
 
-Los tests unitarios se enfocan en probar:
-- Componentes aislados sin dependencias externas
-- Lógica de negocio específica de cada clase/función
-- Casos edge y manejo de errores
-- Validación de interfaces y contratos
+Estructura de tests unitarios:
+    test_smart_agent.py         # Tests del SmartDocAgent core
+    test_web_search_tool.py     # Tests del WebSearchTool
+    test_content_extraction.py  # Tests de extracción de contenido
+    test_search_engines.py      # Tests de motores de búsqueda
+    test_rate_limiter.py        # Tests del rate limiter
+    test_user_agents.py         # Tests de user agents
+    test_web_utils.py           # Tests de utilidades web
 
-Módulos de tests unitarios:
-    test_smart_agent.py          # Tests del agente principal
-    test_web_search_tool.py      # Tests de la herramienta de búsqueda web
-    test_content_extractor.py    # Tests del extractor de contenido
-    test_search_engines.py       # Tests de los motores de búsqueda
-    test_base_tool.py           # Tests de la clase base de herramientas
-    test_session_manager.py     # Tests del gestor de sesiones
-    test_prompt_templates.py    # Tests de las plantillas de prompts
-
-Convenciones:
-- Cada archivo test_*.py corresponde a un módulo específico
-- Se usan mocks extensivamente para aislar componentes
-- Tests rápidos (< 1 segundo por test individual)
-- Cobertura alta de casos edge y errores
-- Nomenclatura descriptiva: test_method_name_when_condition_should_result
+Convenciones para tests unitarios:
+- Prefijo test_ para funciones de test
+- Uso extensivo de mocks para dependencias externas
+- Tests rápidos (< 1 segundo cada uno)
+- Sin dependencias de servicios externos
+- Cobertura completa de casos edge
 
 Ejecución:
     pytest tests/unit/                    # Todos los tests unitarios
@@ -32,179 +26,244 @@ Ejecución:
     pytest -m unit                        # Solo tests marcados como unit
 """
 
+import os
+import sys
 import pytest
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
+import logging
+from pathlib import Path
 from typing import Dict, List, Any, Optional
-import asyncio
+from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
-# Imports del proyecto para validación
-try:
-    from app.agents.core.smart_agent import SmartDocAgent
-    from app.agents.tools.base_tool import BaseTool
-    from app.agents.tools.web.web_search_tool import WebSearchTool
-    IMPORTS_AVAILABLE = True
-except ImportError as e:
-    IMPORTS_AVAILABLE = False
-    IMPORT_ERROR = str(e)
+# Agregar paths para imports
+project_root = Path(__file__).parent.parent.parent
+agent_api_root = project_root / "agent-api"
+tests_root = project_root / "tests"
+
+for path in [str(project_root), str(agent_api_root), str(tests_root)]:
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 # Configuración específica para tests unitarios
 UNIT_TEST_CONFIG = {
-    "default_timeout": 5.0,        # Tests unitarios deben ser rápidos
-    "max_test_duration": 10.0,     # Límite superior para tests individuales
-    "mock_by_default": True,       # Mockear dependencias externas por defecto
-    "allow_real_network": False,   # No permitir llamadas de red reales
-    "allow_real_llm": False,       # No permitir llamadas a LLM reales
-    "allow_real_db": False,        # No permitir acceso a DB real
+    "timeout": 5.0,                    # Tests unitarios deben ser rápidos
+    "max_iterations": 2,               # Límite para evitar loops infinitos
+    "mock_external_services": True,    # Siempre mockear servicios externos
+    "enable_logging": False,           # Desactivar logs por defecto
+    "use_real_network": False          # Nunca usar red real en unit tests
 }
 
-# Fixtures comunes para tests unitarios
-@pytest.fixture
-def mock_ollama_llm():
-    """Mock del LLM Ollama para tests unitarios"""
-    mock_llm = AsyncMock()
-    mock_llm.health_check.return_value = True
-    mock_llm.generate.return_value = {
-        "success": True,
-        "response": "Mocked LLM response for unit testing"
-    }
-    mock_llm.model_name = "test_model"
-    return mock_llm
-
-@pytest.fixture
-def mock_web_search_engine():
-    """Mock del motor de búsqueda para tests unitarios"""
-    mock_engine = Mock()
-    mock_engine.search.return_value = [
+# Mock data para tests unitarios
+UNIT_TEST_MOCK_DATA = {
+    "web_search_results": [
         {
             "title": "Unit Test Result 1",
             "url": "https://example.com/unit-test-1",
-            "snippet": "This is a mocked search result for unit testing purposes."
+            "snippet": "This is a mock search result for unit testing.",
+            "score": 0.95
         },
         {
             "title": "Unit Test Result 2", 
             "url": "https://example.com/unit-test-2",
-            "snippet": "Another mocked search result to ensure comprehensive testing."
+            "snippet": "Another mock search result for comprehensive testing.",
+            "score": 0.87
         }
-    ]
-    mock_engine.name = "mock_search_engine"
-    return mock_engine
-
-@pytest.fixture
-def mock_content_extractor():
-    """Mock del extractor de contenido para tests unitarios"""
-    mock_extractor = Mock()
-    mock_extractor.extract_content.return_value = {
-        "title": "Mocked Page Title",
-        "content": "This is mocked page content extracted for unit testing. " * 10,
-        "metadata": {
-            "word_count": 100,
-            "reading_time": 2,
-            "language": "en"
-        }
+    ],
+    "agent_responses": {
+        "simple": "This is a simple mock response from the agent.",
+        "complex": "This is a more complex mock response that includes multiple sentences and covers various aspects of the query.",
+        "with_sources": "Based on the available sources, here is a comprehensive response with references."
+    },
+    "session_data": {
+        "session_id": "unit-test-session-123",
+        "topic": "Unit Test Research Topic",
+        "status": "active",
+        "created_at": "2024-01-01T00:00:00Z"
     }
-    return mock_extractor
+}
 
-@pytest.fixture
-def sample_agent_config():
-    """Configuración de ejemplo para el agente en tests unitarios"""
-    return {
-        "model_name": "test_model",
-        "temperature": 0.7,
-        "max_tokens": 1000,
-        "timeout": 30.0,
-        "retry_attempts": 3,
-        "tools": ["web_search"],
-        "session_config": {
-            "max_messages": 100,
-            "context_window": 4000
-        }
-    }
+# =============================================================================
+# HELPER FUNCTIONS PARA UNIT TESTS
+# =============================================================================
 
-@pytest.fixture
-def sample_research_session():
-    """Sesión de investigación de ejemplo para tests"""
-    return {
-        "session_id": "test_session_12345",
-        "topic": "Unit Testing Best Practices",
-        "objectives": [
-            "Learn about test isolation principles",
-            "Understand mocking strategies",
-            "Find code coverage best practices"
-        ],
-        "research_depth": "standard",
-        "max_sources": 10,
-        "created_at": "2024-01-25T10:00:00Z",
-        "message_count": 0,
-        "status": "active"
-    }
-
-@pytest.fixture
-def mock_session_manager():
-    """Mock del gestor de sesiones para tests unitarios"""
-    mock_manager = Mock()
-    mock_manager.create_session.return_value = "test_session_12345"
-    mock_manager.get_session.return_value = {
-        "session_id": "test_session_12345",
-        "topic": "Test Topic",
-        "objectives": ["Test Objective"],
-        "message_count": 0
-    }
-    mock_manager.update_session.return_value = True
-    mock_manager.delete_session.return_value = True
-    mock_manager.list_sessions.return_value = []
-    return mock_manager
-
-# Utilidades para tests unitarios
-class UnitTestHelpers:
-    """Utilidades compartidas para tests unitarios"""
+def get_mock_agent():
+    """Crear un mock del SmartDocAgent para tests unitarios"""
+    mock_agent = AsyncMock()
+    mock_agent.is_initialized = True
+    mock_agent.model_name = "test-model"
+    mock_agent.max_iterations = UNIT_TEST_CONFIG["max_iterations"]
+    mock_agent.tools = []
+    mock_agent.active_sessions = {}
     
-    @staticmethod
-    def create_mock_agent(with_tools: bool = True) -> Mock:
-        """Crear un mock del SmartDocAgent para tests"""
-        mock_agent = AsyncMock(spec=SmartDocAgent)
-        mock_agent.initialized = True
-        mock_agent.model_name = "test_model"
-        
-        if with_tools:
-            mock_tool = Mock(spec=BaseTool)
-            mock_tool.name = "mock_tool"
-            mock_tool._arun = AsyncMock(return_value="Mock tool result")
-            mock_agent.tools = [mock_tool]
+    # Mock métodos principales
+    mock_agent.initialize.return_value = None
+    mock_agent.create_research_session.return_value = UNIT_TEST_MOCK_DATA["session_data"]["session_id"]
+    mock_agent.process_query.return_value = {
+        "success": True,
+        "response": UNIT_TEST_MOCK_DATA["agent_responses"]["simple"],
+        "sources": [],
+        "reasoning": "Unit test reasoning",
+        "confidence": 0.85
+    }
+    
+    return mock_agent
+
+def get_mock_web_search_tool():
+    """Crear un mock del WebSearchTool para tests unitarios"""
+    mock_tool = AsyncMock()
+    mock_tool.name = "web_search"
+    mock_tool.description = "Mock web search tool for unit testing"
+    mock_tool.version = "1.0.0"
+    mock_tool.enabled = True
+    
+    # Mock del método principal
+    mock_tool._arun.return_value = "Mock web search results: " + str(UNIT_TEST_MOCK_DATA["web_search_results"])
+    mock_tool.search.return_value = UNIT_TEST_MOCK_DATA["web_search_results"]
+    
+    return mock_tool
+
+def get_mock_ollama_client():
+    """Crear un mock del cliente Ollama para tests unitarios"""
+    mock_client = AsyncMock()
+    mock_client.health_check.return_value = True
+    mock_client.generate.return_value = {
+        "success": True,
+        "response": UNIT_TEST_MOCK_DATA["agent_responses"]["simple"],
+        "model": "test-model",
+        "total_duration": 1000000000  # 1 segundo en nanosegundos
+    }
+    
+    return mock_client
+
+def get_mock_http_response(status_code=200, content="Mock content"):
+    """Crear un mock de respuesta HTTP"""
+    mock_response = Mock()
+    mock_response.status_code = status_code
+    mock_response.text = content
+    mock_response.content = content.encode()
+    mock_response.json.return_value = {"status": "ok", "data": content}
+    mock_response.headers = {"content-type": "text/html"}
+    
+    return mock_response
+
+def setup_unit_test_environment():
+    """Configurar el entorno para tests unitarios"""
+    # Configurar logging para tests
+    if not UNIT_TEST_CONFIG["enable_logging"]:
+        logging.disable(logging.CRITICAL)
+    
+    # Configurar variables de entorno para tests
+    os.environ["TEST_ENV"] = "unit"
+    os.environ["LOG_LEVEL"] = "ERROR"
+    os.environ["USE_REAL_SERVICES"] = "false"
+
+def teardown_unit_test_environment():
+    """Limpiar después de tests unitarios"""
+    # Re-habilitar logging
+    logging.disable(logging.NOTSET)
+    
+    # Limpiar variables de entorno
+    test_env_vars = ["TEST_ENV", "LOG_LEVEL", "USE_REAL_SERVICES"]
+    for var in test_env_vars:
+        os.environ.pop(var, None)
+
+# =============================================================================
+# ASSERTION HELPERS
+# =============================================================================
+
+def assert_valid_agent_response(response):
+    """Verificar que una respuesta del agent es válida"""
+    assert isinstance(response, dict), "Agent response must be a dict"
+    assert "success" in response, "Response must include success field"
+    assert "response" in response, "Response must include response field"
+    assert isinstance(response["response"], str), "Response text must be a string"
+    assert len(response["response"]) > 0, "Response text cannot be empty"
+
+def assert_valid_search_results(results):
+    """Verificar que los resultados de búsqueda son válidos"""
+    assert isinstance(results, list), "Search results must be a list"
+    for result in results:
+        assert isinstance(result, dict), "Each result must be a dict"
+        assert "title" in result, "Result must have title"
+        assert "url" in result, "Result must have URL"
+        assert "snippet" in result, "Result must have snippet"
+
+def assert_valid_session_data(session_data):
+    """Verificar que los datos de sesión son válidos"""
+    assert isinstance(session_data, dict), "Session data must be a dict"
+    assert "session_id" in session_data, "Session must have ID"
+    assert "status" in session_data, "Session must have status"
+    assert isinstance(session_data["session_id"], str), "Session ID must be string"
+
+def assert_mock_called_with_partial(mock, **partial_kwargs):
+    """Verificar que un mock fue llamado con argumentos parciales"""
+    assert mock.called, "Mock was not called"
+    
+    call_args = mock.call_args
+    if call_args is None:
+        pytest.fail("Mock was called but no call args recorded")
+    
+    args, kwargs = call_args
+    for key, expected_value in partial_kwargs.items():
+        if key in kwargs:
+            assert kwargs[key] == expected_value, f"Expected {key}={expected_value}, got {kwargs[key]}"
         else:
-            mock_agent.tools = []
-        
-        # Métodos principales
-        mock_agent.initialize.return_value = None
-        mock_agent.create_research_session.return_value = "test_session_12345"
-        mock_agent.process_query.return_value = {
-            "success": True,
-            "response": "Mock agent response",
-            "session_id": "test_session_12345"
-        }
-        mock_agent.get_session_status.return_value = {
-            "session_id": "test_session_12345",
-            "topic": "Test Topic",
-            "message_count": 1
-        }
-        mock_agent.close.return_value = None
-        
-        return mock_agent
+            pytest.fail(f"Expected argument {key} not found in call")
+
+def assert_response_time_acceptable(duration, max_time=UNIT_TEST_CONFIG["timeout"]):
+    """Verificar que el tiempo de respuesta es aceptable para unit tests"""
+    assert duration < max_time, f"Response took {duration:.2f}s, max allowed for unit tests: {max_time}s"
+
+# =============================================================================
+# TEST DATA PATHS
+# =============================================================================
+
+def get_test_data_path(filename):
+    """Obtener la ruta a un archivo de datos de test"""
+    test_data_dir = Path(__file__).parent / "data"
+    test_data_dir.mkdir(exist_ok=True)
+    return test_data_dir / filename
+
+def get_mock_data_path(filename):
+    """Obtener la ruta a un archivo de datos mock"""
+    mock_data_dir = Path(__file__).parent / "mock_data"
+    mock_data_dir.mkdir(exist_ok=True)
+    return mock_data_dir / filename
+
+# =============================================================================
+# EXPORTS
+# =============================================================================
+
+__all__ = [
+    # Configuration
+    "UNIT_TEST_CONFIG",
+    "UNIT_TEST_MOCK_DATA",
     
-    @staticmethod
-    def create_mock_web_tool() -> Mock:
-        """Crear un mock de WebSearchTool para tests"""
-        mock_tool = AsyncMock(spec=WebSearchTool)
-        mock_tool.name = "web_search"
-        mock_tool.description = "Mock web search tool for unit testing"
-        
-        mock_tool._arun.return_value = "Mock web search results: Found 5 relevant results about the topic."
-        mock_tool.get_tool_info.return_value = {
-            "name": "web_search",
-            "description": "Search the web for information",
-            "parameters": {"query": "string"}
-        }
-        
-        return mock_tool
+    # Mock helpers
+    "get_mock_agent",
+    "get_mock_web_search_tool", 
+    "get_mock_ollama_client",
+    "get_mock_http_response",
     
-    @staticmethod
-    def assert_mock_called_with_partial(mock):
+    # Environment setup
+    "setup_unit_test_environment",
+    "teardown_unit_test_environment",
+    
+    # Assertion helpers
+    "assert_valid_agent_response",
+    "assert_valid_search_results",
+    "assert_valid_session_data",
+    "assert_mock_called_with_partial",
+    "assert_response_time_acceptable",
+    
+    # Path helpers
+    "get_test_data_path",
+    "get_mock_data_path"
+]
+
+# Metadata del paquete
+__version__ = "1.0.0"
+__author__ = "SmartDoc Team"
+__description__ = "Unit tests package for SmartDoc Research Agent"
+
+# Auto-setup cuando se importa el paquete
+setup_unit_test_environment()

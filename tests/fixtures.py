@@ -672,3 +672,122 @@ __all__ = [
 MOCK_RESEARCH_SESSIONS = []
 MOCK_SEARCH_RESULTS = []
 
+
+# =============================================================================
+# MISSING EXPORTS - Added by fix script
+# =============================================================================
+
+# Mock web content for tests
+MOCK_WEB_CONTENT = {
+    "title": "Sample Web Page",
+    "url": "https://example.com/test-page",
+    "content": "This is sample web content for testing purposes.",
+    "metadata": {
+        "author": "Test Author",
+        "date": "2024-01-01",
+        "description": "Test page description"
+    },
+    "clean_text": "This is clean sample web content for testing.",
+    "word_count": 150,
+    "extraction_time": 0.25
+}
+
+# Sample research topics for E2E tests
+SAMPLE_RESEARCH_TOPICS = [
+    "Python programming best practices",
+    "Machine learning fundamentals", 
+    "Web development with FastAPI",
+    "Docker containerization guide",
+    "Data analysis with pandas"
+]
+
+# Mock agent response for testing
+MOCK_AGENT_RESPONSE = {
+    "response": "This is a mock response from the SmartDoc agent for testing purposes.",
+    "sources": [
+        {
+            "type": "web",
+            "url": "https://example.com/source1",
+            "title": "Test Source 1",
+            "snippet": "This is a test snippet from source 1."
+        },
+        {
+            "type": "web", 
+            "url": "https://example.com/source2",
+            "title": "Test Source 2",
+            "snippet": "This is a test snippet from source 2."
+        }
+    ],
+    "reasoning": "Test reasoning: The agent analyzed the query and found relevant information.",
+    "confidence": 0.85,
+    "session_id": "test-session-123"
+}
+
+# Mock session status
+MOCK_SESSION_STATUS = {
+    "session_id": "test-session-123",
+    "topic": "Test research topic",
+    "status": "active",
+    "progress": 0.75,
+    "current_task": "analyzing sources",
+    "sources_found": 5,
+    "confidence_score": 0.82,
+    "created_at": "2024-01-01T00:00:00Z",
+    "updated_at": "2024-01-01T01:00:00Z"
+}
+
+# Performance test queries
+PERFORMANCE_TEST_QUERIES = [
+    "quick test query",
+    "medium complexity research topic",
+    "complex multi-part research question about technology"
+]
+
+# E2E research scenario
+E2E_RESEARCH_SCENARIO = {
+    "topic": "Python web development with FastAPI",
+    "objectives": [
+        "Understand FastAPI basics",
+        "Learn about async programming",
+        "Explore deployment options"
+    ],
+    "expected_sources": 5,
+    "max_duration": 120,
+    "confidence_threshold": 0.7
+}
+
+# Mock search results
+def get_mock_search_results(query="test query"):
+    """Generate mock search results for testing"""
+    return [
+        {
+            "title": f"Test Result 1 for {query}",
+            "url": "https://example.com/result1",
+            "snippet": f"This is a test snippet for {query} from result 1.",
+            "score": 0.95
+        },
+        {
+            "title": f"Test Result 2 for {query}",
+            "url": "https://example.com/result2", 
+            "snippet": f"This is a test snippet for {query} from result 2.",
+            "score": 0.87
+        },
+        {
+            "title": f"Test Result 3 for {query}",
+            "url": "https://example.com/result3",
+            "snippet": f"This is a test snippet for {query} from result 3.",
+            "score": 0.78
+        }
+    ]
+
+# Update __all__ to include new exports
+__all__.extend([
+    "MOCK_WEB_CONTENT",
+    "SAMPLE_RESEARCH_TOPICS", 
+    "MOCK_AGENT_RESPONSE",
+    "MOCK_SESSION_STATUS",
+    "PERFORMANCE_TEST_QUERIES",
+    "E2E_RESEARCH_SCENARIO",
+    "get_mock_search_results"
+])
+
