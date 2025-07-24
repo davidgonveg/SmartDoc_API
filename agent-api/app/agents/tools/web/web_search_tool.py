@@ -7,6 +7,7 @@ import asyncio
 import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
+from pydantic import Field, PrivateAttr
 from dataclasses import dataclass
 import json
 
@@ -16,6 +17,9 @@ from .search_engines import search_engine_manager, SearchResult, SearchResponse
 from .content_extractor import global_content_extractor, ExtractedContent
 from .rate_limiter import global_rate_limiter
 from .web_utils import robots_checker, URLNormalizer, get_content_hash
+
+# Type hints para Pydantic
+from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -100,37 +104,82 @@ class WebSearchTool(BaseTool):
     - Deduplicación de resultados
     """
     
-    name = "web_search"
-    description = "Busca información actualizada en internet y extrae contenido de páginas relevantes"
-    category = ToolCategory.WEB_SEARCH
-    version = "1.0.0"
-    requires_internet = True
-    requires_gpu = False
-    max_execution_time = 120  # 2 minutos
-    rate_limit = 30  # 30 búsquedas por minuto
+    # Campos públicos de Pydantic (heredados de BaseTool)
+    name: str = "web_search"
+    description: str = "Busca información actualizada en internet y extrae contenido de páginas relevantes"
+    category: ToolCategory = ToolCategory.WEB_SEARCH
+    version: str = "1.0.0"
+    requires_internet: bool = True
+    requires_gpu: bool = False
+    max_execution_time: int = 120  # 2 minutos
+    rate_limit: int = 30  # 30 búsquedas por minuto
+    
+    # Campos privados usando PrivateAttr
+    _results_cache: Dict[str, Tuple[str, float]] = PrivateAttr(default_factory=dict)
+    _cache_ttl: int = PrivateAttr(default=3600)  # 1 hora
+    _stats: Dict[str, int] = PrivateAttr(default_factory=lambda: {
+        'total_searches': 0,
+        'successful_searches': 0,
+        'total_extractions': 0,
+        'successful_extractions': 0,
+        'cache_hits': 0,
+        'robots_blocks': 0,
+        'rate_limit_blocks': 0
+    })
+    
+    # Referencias a componentes externos (se inicializan en __init__)
+    _config: Any = PrivateAttr(default=None)
+    _search_manager: Any = PrivateAttr(default=None)
+    _content_extractor: Any = PrivateAttr(default=None)
+    _rate_limiter: Any = PrivateAttr(default=None)
+    _robots_checker: Any = PrivateAttr(default=None)
     
     def __init__(self, **kwargs):
+        # Inicializar padre primero
         super().__init__(**kwargs)
-        self.config = WebSearchConfig()
-        self.search_manager = search_engine_manager
-        self.content_extractor = global_content_extractor
-        self.rate_limiter = global_rate_limiter
-        self.robots_checker = robots_checker
         
-        # Cache interno para resultados
-        self._results_cache = {}
-        self._cache_ttl = 3600  # 1 hora
+        # Inicializar componentes externos después de que Pydantic configure los campos
+        from .config import WebSearchConfig
+        from .search_engines import search_engine_manager
+        from .content_extractor import global_content_extractor
+        from .rate_limiter import global_rate_limiter
+        from .web_utils import robots_checker
         
-        # Estadísticas de uso
-        self.stats = {
-            'total_searches': 0,
-            'successful_searches': 0,
-            'total_extractions': 0,
-            'successful_extractions': 0,
-            'cache_hits': 0,
-            'robots_blocks': 0,
-            'rate_limit_blocks': 0
-        }
+        self._config = WebSearchConfig()
+        self._search_manager = search_engine_manager
+        self._content_extractor = global_content_extractor
+        self._rate_limiter = global_rate_limiter
+        self._robots_checker = robots_checker
+    
+    @property
+    def config(self):
+        """Acceso al config"""
+        return self._config
+    
+    @property
+    def search_manager(self):
+        """Acceso al search manager"""
+        return self._search_manager
+    
+    @property
+    def content_extractor(self):
+        """Acceso al content extractor"""
+        return self._content_extractor
+    
+    @property
+    def rate_limiter(self):
+        """Acceso al rate limiter"""
+        return self._rate_limiter
+    
+    @property
+    def robots_checker(self):
+        """Acceso al robots checker"""
+        return self._robots_checker
+    
+    @property
+    def stats(self):
+        """Acceso a estadísticas"""
+        return self._stats
     
     async def _arun(self, query: str, **kwargs) -> str:
         """Implementación principal del tool de búsqueda web"""
@@ -148,7 +197,7 @@ class WebSearchTool(BaseTool):
             )
             
             if not can_proceed:
-                self.stats['rate_limit_blocks'] += 1
+                self._stats['rate_limit_blocks'] += 1
                 return self._format_error_response("Rate limit exceeded. Please try again later.")
             
             # Verificar cache
@@ -156,7 +205,7 @@ class WebSearchTool(BaseTool):
             cached_result = self._get_cached_result(cache_key)
             
             if cached_result:
-                self.stats['cache_hits'] += 1
+                self._stats['cache_hits'] += 1
                 logger.info("Returning cached search results")
                 return cached_result
             
@@ -182,8 +231,8 @@ class WebSearchTool(BaseTool):
             self._cache_result(cache_key, formatted_response)
             
             # Actualizar estadísticas
-            self.stats['total_searches'] += 1
-            self.stats['successful_searches'] += 1
+            self._stats['total_searches'] += 1
+            self._stats['successful_searches'] += 1
             
             return formatted_response
             

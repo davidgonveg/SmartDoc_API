@@ -12,7 +12,7 @@ from datetime import datetime
 from enum import Enum
 
 from langchain.tools import BaseTool as LangChainBaseTool
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, PrivateAttr
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class BaseTool(LangChainBaseTool, ABC):
     - get_tool_info(): Información detallada de la herramienta
     """
     
-    # Metadatos de la herramienta
+    # Metadatos de la herramienta (campos públicos de Pydantic)
     category: ToolCategory
     version: str = "1.0.0"
     requires_internet: bool = False
@@ -67,10 +67,15 @@ class BaseTool(LangChainBaseTool, ABC):
     max_execution_time: int = 60  # segundos
     rate_limit: Optional[int] = None  # requests per minute
     
-    # Estado interno
-    _last_execution: Optional[datetime] = None
-    _execution_count: int = 0
-    _rate_limit_tracker: List[datetime] = []
+    # Estado interno (campos privados usando PrivateAttr)
+    _last_execution: Optional[datetime] = PrivateAttr(default=None)
+    _execution_count: int = PrivateAttr(default=0)
+    _rate_limit_tracker: List[datetime] = PrivateAttr(default_factory=list)
+    
+    # Configuración de Pydantic
+    class Config:
+        arbitrary_types_allowed = True  # Permite tipos no-Pydantic como datetime
+        underscore_attrs_are_private = True  # Hace que atributos con _ sean privados
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

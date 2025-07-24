@@ -13,7 +13,7 @@ from datetime import datetime
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.callbacks import AsyncCallbackHandler
+from langchain_core.callbacks import AsyncCallbackHandler
 from langchain_ollama import OllamaLLM
 
 from app.agents.prompts.react_templates import ReactTemplates, SMARTDOC_SYSTEM_PROMPT
