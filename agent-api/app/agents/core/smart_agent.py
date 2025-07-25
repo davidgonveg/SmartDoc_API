@@ -26,37 +26,79 @@ from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+
 class SmartDocCallbackHandler(AsyncCallbackHandler):
-    """Callback handler para capturar el pensamiento del agente"""
+    """Callback handler optimizado para capturar el pensamiento del agente"""
     
-    def __init__(self):
+    def __init__(self, max_stored_steps: int = 50):
         self.thoughts = []
         self.actions = []
         self.observations = []
         self.current_step = 0
+        self.max_stored_steps = max_stored_steps
+        self.start_time = datetime.now()
         
     async def on_agent_action(self, action, **kwargs):
-        """Captura acciones del agente"""
-        self.actions.append({
+        """Captura acciones del agente con límite de memoria"""
+        action_data = {
             "step": self.current_step,
             "tool": action.tool,
-            "input": action.tool_input,
+            "input": str(action.tool_input)[:500],  # ← Limitar tamaño
             "timestamp": datetime.now().isoformat()
-        })
-        logger.info(f"Agente ejecutando: {action.tool} con input: {action.tool_input}")
+        }
+        
+        self.actions.append(action_data)
+        
+        # Limitar memoria - solo guardar últimos N pasos
+        if len(self.actions) > self.max_stored_steps:
+            self.actions = self.actions[-self.max_stored_steps:]
+        
+        logger.info(f"🔧 Step {self.current_step}: {action.tool} - {str(action.tool_input)[:100]}...")
         
     async def on_agent_finish(self, finish, **kwargs):
-        """Captura finalización del agente"""
-        logger.info(f"Agente completado con output: {finish.return_values}")
+        """Captura finalización con métricas"""
+        duration = (datetime.now() - self.start_time).total_seconds()
+        logger.info(f"✅ Agente completado en {duration:.2f}s - Steps: {self.current_step}")
         
     async def on_tool_end(self, output, **kwargs):
-        """Captura resultados de herramientas"""
-        self.observations.append({
+        """Captura resultados con gestión de memoria"""
+        obs_data = {
             "step": self.current_step,
-            "output": str(output)[:500],  # Limitar longitud
-            "timestamp": datetime.now().isoformat()
-        })
+            "output": str(output)[:300],  # ← Limitar más agresivamente
+            "timestamp": datetime.now().isoformat(),
+            "success": True
+        }
+        
+        self.observations.append(obs_data)
+        
+        # Limitar memoria
+        if len(self.observations) > self.max_stored_steps:
+            self.observations = self.observations[-self.max_stored_steps:]
+        
         self.current_step += 1
+        
+    async def on_tool_error(self, error, **kwargs):
+        """Captura errores de herramientas"""
+        error_data = {
+            "step": self.current_step,
+            "error": str(error)[:200],
+            "timestamp": datetime.now().isoformat(),
+            "success": False
+        }
+        
+        self.observations.append(error_data)
+        logger.error(f"❌ Tool error at step {self.current_step}: {str(error)[:100]}")
+        
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Obtener métricas de performance"""
+        duration = (datetime.now() - self.start_time).total_seconds()
+        return {
+            "duration_seconds": duration,
+            "total_steps": self.current_step,
+            "actions_count": len(self.actions),
+            "avg_step_time": duration / max(self.current_step, 1),
+            "success_rate": len([obs for obs in self.observations if obs.get("success", True)]) / max(len(self.observations), 1)
+        }
 
 class ResearchSession:
     """Clase para manejar sesiones de investigación"""
@@ -106,17 +148,21 @@ class SmartDocAgent:
     """Agente principal de investigación SmartDoc"""
     
     def __init__(self, 
-                 model_name: str = None,
-                 ollama_host: str = None,
-                 research_style: str = "general",
-                 max_iterations: int = 5):
+                model_name: str = None,
+                ollama_host: str = None,
+                research_style: str = "general",
+                max_iterations: int = 15,  # ✅ Ya actualizado
+                enable_streaming: bool = True,  # ✅ Ya agregado
+                optimization_level: str = "balanced"):  # ✅ Ya agregado
         
         self.settings = get_settings()
         self.model_name = model_name or self.settings.default_model
         self.ollama_host = ollama_host or self.settings.ollama_host
         self.research_style = research_style
         self.max_iterations = max_iterations
-        
+        self.enable_streaming = enable_streaming  # ← USAR ESTE PARÁMETRO
+        self.optimization_level = optimization_level
+            
         # Componentes principales
         self.llm = None
         self.agent_executor = None
@@ -131,9 +177,11 @@ class SmartDocAgent:
         logger.info(f"SmartDocAgent creado - Modelo: {self.model_name}, Estilo: {research_style}")
     
     async def initialize(self) -> bool:
-        """Inicializar el agente LangChain REAL"""
         try:
             logger.info("🚀 Inicializando SmartDocAgent con LangChain...")
+            
+            # 5. Configurar callback handler ANTES  ← MOVER AQUÍ
+            self.callback_handler = SmartDocCallbackHandler()
             
             # 1. CONFIGURAR LLM REAL - ChatOllama
             await self._setup_llm_real()
@@ -144,11 +192,10 @@ class SmartDocAgent:
             # 3. CREAR AGENT LANGCHAIN REAL
             await self._create_langchain_agent()
             
-            # 4. Configurar memoria (básica por ahora)
+            # 4. Configurar memoria
             self._setup_memory()
             
-            # 5. Configurar callback handler
-            self.callback_handler = SmartDocCallbackHandler()
+            # Ya no crear callback aquí
             
             self.is_initialized = True
             logger.info("✅ SmartDocAgent inicializado correctamente con LangChain")
@@ -157,24 +204,78 @@ class SmartDocAgent:
         except Exception as e:
             logger.error(f"❌ Error inicializando SmartDocAgent: {e}")
             return False
+        
+        
+    async def _optimize_for_hardware(self):
+        """Optimizar parámetros según hardware disponible"""
+        try:
+            # Detectar si hay GPU disponible
+            import subprocess
+            try:
+                result = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=5)
+                has_gpu = result.returncode == 0
+            except:
+                has_gpu = False
+            
+            if has_gpu and self.optimization_level == "performance":
+                # GPU Mode - Parámetros agresivos
+                self.llm_params = {
+                    "temperature": 0.7,
+                    "num_ctx": 16384,      # ← Más contexto con GPU
+                    "num_predict": 2048,   # ← Respuestas más largas
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1,
+                    "num_thread": 8        # ← Más threads
+                }
+                logger.info("🎮 GPU detectada - Modo performance")
+                
+            elif self.optimization_level == "balanced":
+                # Balanced Mode - Tus parámetros actuales
+                self.llm_params = {
+                    "temperature": 0.7,
+                    "num_ctx": 8192,
+                    "num_predict": 1024,
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1
+                }
+                logger.info("⚖️ Modo balanced configurado")
+                
+            else:
+                # CPU Mode - Parámetros conservadores
+                self.llm_params = {
+                    "temperature": 0.6,
+                    "num_ctx": 4096,       # ← Menos contexto para CPU
+                    "num_predict": 512,    # ← Respuestas más cortas
+                    "top_p": 0.8,
+                    "repeat_penalty": 1.0
+                }
+                logger.info("💻 Modo CPU - Parámetros conservadores")
+                
+        except Exception as e:
+            logger.error(f"Error optimizando hardware: {e}")
+            # Fallback a balanced
+            self.optimization_level = "balanced"
 
     async def _setup_llm_real(self):
-        """Configurar LLM real usando ChatOllama"""
+        """Configurar LLM real usando ChatOllama con optimización de hardware"""
         try:
-            # Crear instancia ChatOllama real
+            # Optimizar parámetros según hardware
+            await self._optimize_for_hardware()
+            
+            base_url = f"http://{self.ollama_host}:11434"
+            
+            # Crear instancia ChatOllama con parámetros optimizados
             self.llm = ChatOllama(
                 model=self.model_name,
-                base_url=f"http://{self.ollama_host}:11434",
-                temperature=0.1,
-                top_p=0.9,
-                num_predict=2048,
-                verbose=True
+                base_url=base_url,
+                streaming=self.enable_streaming,
+                **self.llm_params  # ← Usar parámetros optimizados
             )
             
-            # Test de conexión REAL
-            logger.info(f"🔗 Conectando con Ollama en {self.ollama_host}:11434...")
+            # Test de conexión
+            logger.info(f"🔗 Conectando con Ollama en {base_url}...")
             test_response = await self.llm.ainvoke("Hello, are you working?")
-            logger.info(f"✅ LLM conectado correctamente: {test_response.content[:100]}...")
+            logger.info(f"✅ LLM conectado: {test_response.content[:100]}...")
             
         except Exception as e:
             logger.error(f"❌ Error configurando LLM: {e}")
@@ -214,9 +315,12 @@ class SmartDocAgent:
                 tools=self.tools,
                 verbose=True,
                 handle_parsing_errors=True,
-                max_iterations=self.max_iterations,
-                callbacks=[self.callback_handler] if self.callback_handler else None
-            )
+                max_iterations=self.max_iterations,  # Ahora 15
+                max_execution_time=300,  # ← NUEVO: 5 min timeout
+                early_stopping_method="force",  # ← NUEVO
+                return_intermediate_steps=True,  # ← NUEVO: para debugging
+                callbacks=[self.callback_handler]
+            )               
             
             logger.info("✅ AgentExecutor LangChain creado correctamente")
             
@@ -254,14 +358,24 @@ class SmartDocAgent:
         logger.info(f"Tools configuradas: {len(self.tools)} herramientas disponibles")
     
     def _setup_memory(self):
-        """Configurar sistema de memoria del agente"""
+        """Configurar sistema de memoria optimizado"""
+        # Memoria adaptable según optimization_level
+        if self.optimization_level == "performance":
+            memory_window = 20  # Más memoria para análisis profundo
+        elif self.optimization_level == "balanced":
+            memory_window = 10  # Balance memoria/performance
+        else:
+            memory_window = 5   # Memoria limitada para CPU
+        
         self.memory = ConversationBufferWindowMemory(
-            k=10,  # Mantener últimos 10 intercambios
+            k=memory_window,
             return_messages=True,
             memory_key="chat_history",
-            input_key="input"
+            input_key="input",
+            output_key="output"
         )
-        logger.info("Sistema de memoria configurado")
+        
+        logger.info(f"💾 Memoria configurada - Window: {memory_window} mensajes")
     
     def _create_react_agent(self):
         """Crear el agente ReAct con LangChain"""
