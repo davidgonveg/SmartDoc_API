@@ -3,6 +3,7 @@ SmartDoc Agent - Clase principal del agente de investigación
 Implementación del agente usando LangChain + Ollama con patrón ReAct
 """
 
+
 import asyncio
 import logging
 import json
@@ -10,14 +11,17 @@ import uuid
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
+# IMPORTS LANGCHAIN REALES - CRÍTICOS
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferWindowMemory
 from langchain_core.callbacks import AsyncCallbackHandler
-from langchain_ollama import OllamaLLM
+from langchain_ollama import ChatOllama  # ← CAMBIADO de OllamaLLM
+from langchain.prompts import PromptTemplate
 
-from app.agents.prompts.react_templates import ReactTemplates, SMARTDOC_SYSTEM_PROMPT
-from app.agents.tools.base_tool import BaseTool
+# Imports del proyecto
+from app.agents.prompts.react_templates import ReactTemplates, SMARTDOC_SYSTEM_PROMPT, REACT_MAIN_TEMPLATE
+from app.agents.tools.web.web_search_tool import WebSearchTool  # ← IMPORT DEL TOOL REAL
 from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -127,39 +131,98 @@ class SmartDocAgent:
         logger.info(f"SmartDocAgent creado - Modelo: {self.model_name}, Estilo: {research_style}")
     
     async def initialize(self) -> bool:
-        """Inicializar el agente y todos sus componentes"""
+        """Inicializar el agente LangChain REAL"""
         try:
-            logger.info("Inicializando SmartDocAgent...")
+            logger.info("🚀 Inicializando SmartDocAgent con LangChain...")
             
-            # 1. Configurar LLM
-            await self._setup_llm()
+            # 1. CONFIGURAR LLM REAL - ChatOllama
+            await self._setup_llm_real()
             
-            # 2. Configurar herramientas (por ahora vacías)
-            await self._setup_tools()
+            # 2. CONFIGURAR HERRAMIENTAS REALES
+            await self._setup_tools_real()
             
-            # 3. Configurar memoria
+            # 3. CREAR AGENT LANGCHAIN REAL
+            await self._create_langchain_agent()
+            
+            # 4. Configurar memoria (básica por ahora)
             self._setup_memory()
             
-            # 4. Configurar callback handler
+            # 5. Configurar callback handler
             self.callback_handler = SmartDocCallbackHandler()
             
-            # 5. Crear el agente ReAct
-            self._create_react_agent()
+            self.is_initialized = True
+            logger.info("✅ SmartDocAgent inicializado correctamente con LangChain")
+            return True
             
-            # 6. Probar funcionamiento
-            test_result = await self._test_agent()
+        except Exception as e:
+            logger.error(f"❌ Error inicializando SmartDocAgent: {e}")
+            return False
+
+    async def _setup_llm_real(self):
+        """Configurar LLM real usando ChatOllama"""
+        try:
+            # Crear instancia ChatOllama real
+            self.llm = ChatOllama(
+                model=self.model_name,
+                base_url=f"http://{self.ollama_host}:11434",
+                temperature=0.1,
+                top_p=0.9,
+                num_predict=2048,
+                verbose=True
+            )
             
-            if test_result:
-                self.is_initialized = True
-                logger.info("✅ SmartDocAgent inicializado correctamente")
-                return True
-            else:
-                logger.error("❌ Falló el test del agente")
-                return False
+            # Test de conexión REAL
+            logger.info(f"🔗 Conectando con Ollama en {self.ollama_host}:11434...")
+            test_response = await self.llm.ainvoke("Hello, are you working?")
+            logger.info(f"✅ LLM conectado correctamente: {test_response.content[:100]}...")
+            
+        except Exception as e:
+            logger.error(f"❌ Error configurando LLM: {e}")
+            raise
+
+    async def _setup_tools_real(self):
+        """Configurar herramientas reales"""
+        try:
+            # Crear WebSearchTool real
+            web_search_tool = WebSearchTool()
+            self.tools = [web_search_tool]
+            
+            logger.info(f"✅ Configuradas {len(self.tools)} herramientas:")
+            for tool in self.tools:
+                logger.info(f"  - {tool.name}: {tool.description[:80]}...")
                 
         except Exception as e:
-            logger.error(f"Error inicializando SmartDocAgent: {e}")
-            return False
+            logger.error(f"❌ Error configurando herramientas: {e}")
+            raise
+
+    async def _create_langchain_agent(self):
+        """Crear AgentExecutor real con LangChain"""
+        try:
+            # Crear prompt template para ReAct
+            react_prompt = PromptTemplate.from_template(REACT_MAIN_TEMPLATE)
+            
+            # Crear agent ReAct real
+            self.agent = create_react_agent(
+                llm=self.llm,
+                tools=self.tools,
+                prompt=react_prompt
+            )
+            
+            # Crear AgentExecutor real
+            self.agent_executor = AgentExecutor(
+                agent=self.agent,
+                tools=self.tools,
+                verbose=True,
+                handle_parsing_errors=True,
+                max_iterations=self.max_iterations,
+                callbacks=[self.callback_handler] if self.callback_handler else None
+            )
+            
+            logger.info("✅ AgentExecutor LangChain creado correctamente")
+            
+        except Exception as e:
+            logger.error(f"❌ Error creando AgentExecutor: {e}")
+            raise
     
     async def _setup_llm(self):
         """Configurar el modelo de lenguaje Ollama"""
@@ -278,52 +341,114 @@ class SmartDocAgent:
         logger.info(f"Sesión creada: {session_id} - Tema: {topic}")
         return session_id
     
-    async def process_query(self, 
-                          session_id: str, 
-                          query: str,
-                          stream: bool = False) -> Dict[str, Any]:
-        """Procesar una consulta del usuario"""
-        
-        if not self.is_initialized:
-            return self._error_response("Agente no inicializado", session_id)
-        
-        if session_id not in self.active_sessions:
-            return self._error_response("Sesión no encontrada", session_id)
-        
-        session = self.active_sessions[session_id]
+    async def process_query(self, session_id: str, query: str) -> Dict[str, Any]:
+        """Procesar query usando AgentExecutor REAL de LangChain"""
         
         try:
-            logger.info(f"Procesando query en sesión {session_id}: {query[:100]}...")
+            # Verificar que el agente está inicializado
+            if not self.is_initialized or not self.agent_executor:
+                return self._error_response("Agent not initialized", session_id)
+            
+            # Obtener sesión
+            session = self.active_sessions.get(session_id)
+            if not session:
+                return self._error_response("Session not found", session_id)
+            
+            logger.info(f"🤖 Procesando query con LangChain: {query[:100]}...")
             
             # Agregar mensaje del usuario
             session.add_message("user", query)
             
-            # Resetear callback handler
-            if self.callback_handler:
-                self.callback_handler.thoughts = []
-                self.callback_handler.actions = []
-                self.callback_handler.observations = []
-                self.callback_handler.current_step = 0
-            
-            # Procesar con agente o modo directo
-            if self.agent_executor:
-                result = await self._process_with_agent_executor(session, query)
-            else:
-                result = await self._process_direct_mode(session, query)
+            # EJECUTAR CON LANGCHAIN REAL
+            result = await self._execute_with_langchain(session, query)
             
             # Agregar respuesta del agente
-            session.add_message("assistant", result["response"], {
-                "confidence": result.get("confidence", 0.0),
-                "sources_count": len(result.get("sources", [])),
-                "reasoning_steps": len(self.callback_handler.actions) if self.callback_handler else 0
-            })
+            session.add_message("assistant", result["response"])
             
-            logger.info(f"Query procesado exitosamente para sesión {session_id}")
+            logger.info(f"✅ Query procesada exitosamente")
             return result
             
         except Exception as e:
-            logger.error(f"Error procesando query: {e}")
+            logger.error(f"❌ Error procesando query: {e}")
             return self._error_response(f"Error: {str(e)}", session_id)
+
+    async def _execute_with_langchain(self, session: ResearchSession, query: str) -> Dict[str, Any]:
+        """Ejecutar query con AgentExecutor real"""
+        
+        try:
+            # Preparar input para LangChain
+            agent_input = {
+                "input": query,
+                "topic": session.topic,
+                "objectives": ", ".join(session.objectives) if session.objectives else "General research",
+                "chat_history": session.get_chat_history()
+            }
+            
+            logger.info("🔄 Ejecutando con AgentExecutor...")
+            
+            # LLAMADA REAL A LANGCHAIN
+            result = await self.agent_executor.ainvoke(agent_input)
+            
+            # Extraer respuesta
+            response = result.get("output", "No response generated")
+            
+            # Preparar resultado estructurado
+            return {
+                "success": True,
+                "response": response,
+                "sources": self._extract_sources_from_callback(),
+                "reasoning": self._extract_reasoning_from_callback(),
+                "confidence": self._calculate_confidence_from_response(response),
+                "session_id": session.session_id,
+                "model_used": self.model_name,
+                "mode": "langchain_agent"
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error en ejecución LangChain: {e}")
+            raise
+
+    def _extract_sources_from_callback(self) -> List[Dict[str, Any]]:
+        """Extraer fuentes de las acciones del callback"""
+        sources = []
+        
+        if self.callback_handler and hasattr(self.callback_handler, 'actions'):
+            for action in self.callback_handler.actions:
+                if action['tool'] == 'web_search':
+                    sources.append({
+                        "type": "web_search",
+                        "tool": action['tool'],
+                        "input": action['input'],
+                        "timestamp": action['timestamp']
+                    })
+        
+        return sources
+
+    def _extract_reasoning_from_callback(self) -> List[str]:
+        """Extraer pasos de razonamiento del callback"""
+        reasoning = []
+        
+        if self.callback_handler and hasattr(self.callback_handler, 'actions'):
+            for i, action in enumerate(self.callback_handler.actions):
+                reasoning.append(f"Step {i+1}: Used {action['tool']} with input: {action['input']}")
+        
+        return reasoning
+
+    def _calculate_confidence_from_response(self, response: str) -> float:
+        """Calcular confianza basada en la respuesta"""
+        # Heurística simple basada en longitud y contenido
+        if len(response) > 200:
+            confidence = 0.8
+        elif len(response) > 100:
+            confidence = 0.6
+        else:
+            confidence = 0.4
+        
+        # Aumentar si menciona fuentes
+        if any(word in response.lower() for word in ["source", "found", "search", "according"]):
+            confidence += 0.1
+        
+        return min(confidence, 1.0)
     
     async def _process_with_agent_executor(self, session: ResearchSession, query: str) -> Dict[str, Any]:
         """Procesar usando AgentExecutor con herramientas"""

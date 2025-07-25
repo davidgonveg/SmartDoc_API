@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional
 import uuid
 import logging
 
-from app.agents.core.base_agent import SmartDocAgent
+from app.agents.core.smart_agent import SmartDocAgent
 from app.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,12 @@ async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
         )
         
         initialized = await agent.initialize()
+        
+        # Crear research session CRÍTICO
+        research_session_id = await agent.create_research_session(request.topic, request.objectives)
+        
+        # Guardar agente
+        active_agents[session_id] = agent
         
         if not initialized:
             raise HTTPException(status_code=500, detail="Error inicializando agente")

@@ -27,48 +27,38 @@ Tu proceso de trabajo:
 Siempre usa el formato ReAct que se te especifica."""
 
 # Template principal ReAct
-REACT_MAIN_TEMPLATE = """Eres SmartDoc, un agente de investigación inteligente.
+REACT_MAIN_TEMPLATE = """Answer the following questions as best you can. You have access to the following tools:
 
-HERRAMIENTAS DISPONIBLES:
 {tools}
 
-Para usar una herramienta, utiliza exactamente este formato:
-```
-Pensamiento: [tu razonamiento sobre qué hacer]
-Acción: [nombre_de_herramienta]
-Entrada de Acción: [input para la herramienta]
-```
+Use the following format:
 
-Después recibirás:
-```
-Observación: [resultado de la herramienta]
-```
+Question: the input question you must answer
+Thought: you should always think about what to do
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+... (this Thought/Action/Action Input/Observation can repeat N times)
+Thought: I now know the final answer
+Final Answer: the final answer to the original input question
 
-Puedes usar múltiples herramientas. Cuando tengas suficiente información, termina con:
-```
-Pensamiento: Ya tengo suficiente información para responder completamente.
-Respuesta Final: [tu respuesta completa con fuentes y análisis]
-```
+IMPORTANT:
+- Always use tools when you need current information
+- Explain your reasoning step by step
+- Provide sources when possible
+- Be thorough in your research
 
-REGLAS IMPORTANTES:
-- Usa SIEMPRE múltiples fuentes cuando sea posible
-- Explica tu proceso de pensamiento en cada paso
-- Si algo no está claro, reconócelo
-- Incluye fuentes específicas en tu respuesta final
-- Proporciona un nivel de confianza (bajo/medio/alto)
+Session Topic: {topic}
+Session Objectives: {objectives}
 
-SESIÓN ACTUAL:
-Tema de investigación: {topic}
-Objetivos específicos: {objectives}
-
-CONVERSACIÓN HASTA AHORA:
+Previous Conversation:
 {chat_history}
 
-PREGUNTA ACTUAL: {input}
+Begin!
 
-Comienza tu investigación:
+Question: {input}
+Thought:{agent_scratchpad}"""
 
-Pensamiento: {agent_scratchpad}"""
 
 # Template para investigación académica
 ACADEMIC_RESEARCH_TEMPLATE = """Eres SmartDoc configurado en modo ACADÉMICO. 

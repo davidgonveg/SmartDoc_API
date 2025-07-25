@@ -6,12 +6,13 @@ Combina búsqueda, extracción de contenido y rate limiting
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any, Tuple, Type
 from pydantic import Field, PrivateAttr
 from dataclasses import dataclass
 import json
+from langchain.tools import BaseTool
 
-from ..base_tool import BaseTool, ToolResult, ToolInput, ToolCategory, tool_registration
+from ..base_tool import ToolCategory, tool_registration
 from .config import SearchEngine, WebSearchConfig, get_query_config
 from .search_engines import search_engine_manager, SearchResult, SearchResponse
 from .content_extractor import global_content_extractor, ExtractedContent
@@ -91,95 +92,101 @@ class WebSearchResult:
         
         return result
 
-@tool_registration(ToolCategory.WEB_SEARCH)
+
 class WebSearchTool(BaseTool):
     """
     Herramienta de búsqueda web inteligente con extracción de contenido
-    
-    Combina:
-    - Búsqueda en múltiples motores (DuckDuckGo, Google, SearX, Bing)
-    - Extracción inteligente de contenido
-    - Rate limiting respetuoso
-    - Validación de robots.txt
-    - Deduplicación de resultados
     """
     
-    # Campos públicos de Pydantic (heredados de BaseTool)
+    # ATRIBUTOS PÚBLICOS REQUERIDOS POR LANGCHAIN
     name: str = "web_search"
-    description: str = "Busca información actualizada en internet y extrae contenido de páginas relevantes"
-    category: ToolCategory = ToolCategory.WEB_SEARCH
-    version: str = "1.0.0"
-    requires_internet: bool = True
-    requires_gpu: bool = False
-    max_execution_time: int = 120  # 2 minutos
-    rate_limit: int = 30  # 30 búsquedas por minuto
-    
-    # Campos privados usando PrivateAttr
-    _results_cache: Dict[str, Tuple[str, float]] = PrivateAttr(default_factory=dict)
-    _cache_ttl: int = PrivateAttr(default=3600)  # 1 hora
-    _stats: Dict[str, int] = PrivateAttr(default_factory=lambda: {
-        'total_searches': 0,
-        'successful_searches': 0,
-        'total_extractions': 0,
-        'successful_extractions': 0,
-        'cache_hits': 0,
-        'robots_blocks': 0,
-        'rate_limit_blocks': 0
-    })
-    
-    # Referencias a componentes externos (se inicializan en __init__)
-    _config: Any = PrivateAttr(default=None)
-    _search_manager: Any = PrivateAttr(default=None)
-    _content_extractor: Any = PrivateAttr(default=None)
-    _rate_limiter: Any = PrivateAttr(default=None)
-    _robots_checker: Any = PrivateAttr(default=None)
+    description: str = """Search the web for current information on any topic. 
+                        Use this tool when you need up-to-date information that you don't have in your knowledge base.
+                        Input should be a search query string or JSON with parameters like max_results, search_engine, etc.
+                        Returns formatted search results with titles, URLs, snippets and extracted content."""
+                            
+    # CONFIGURACIÓN PYDANTIC - CRÍTICO PARA COMPATIBILIDAD
+    class Config:
+        """Configuración Pydantic para permitir atributos privados"""
+        extra = "allow"  # Permitir atributos adicionales
+        arbitrary_types_allowed = True  # Permitir tipos arbitrarios
+        validate_assignment = False  # No validar en asignación
     
     def __init__(self, **kwargs):
-        # Inicializar padre primero
+        """Inicializar WebSearchTool con configuración de compatibilidad"""
+        # Inicializar padre PRIMERO
         super().__init__(**kwargs)
         
-        # Inicializar componentes externos después de que Pydantic configure los campos
-        from .config import WebSearchConfig
-        from .search_engines import search_engine_manager
-        from .content_extractor import global_content_extractor
-        from .rate_limiter import global_rate_limiter
-        from .web_utils import robots_checker
+        # INICIALIZAR ATRIBUTOS DESPUÉS (evita problemas Pydantic)
+        # Cache y estadísticas
+        object.__setattr__(self, '_results_cache', {})
+        object.__setattr__(self, '_cache_ttl', 3600)  # 1 hora
+        object.__setattr__(self, '_stats', {
+            'total_searches': 0,
+            'successful_searches': 0,
+            'total_extractions': 0,
+            'successful_extractions': 0,
+            'cache_hits': 0,
+            'robots_blocks': 0,
+            'rate_limit_blocks': 0
+        })
         
-        self._config = WebSearchConfig()
-        self._search_manager = search_engine_manager
-        self._content_extractor = global_content_extractor
-        self._rate_limiter = global_rate_limiter
-        self._robots_checker = robots_checker
+        # Inicializar componentes externos
+        try:
+            from .config import WebSearchConfig
+            from .search_engines import search_engine_manager
+            from .content_extractor import global_content_extractor
+            from .rate_limiter import global_rate_limiter
+            from .web_utils import robots_checker
+            
+            object.__setattr__(self, '_config', WebSearchConfig())
+            object.__setattr__(self, '_search_manager', search_engine_manager)
+            object.__setattr__(self, '_content_extractor', global_content_extractor)
+            object.__setattr__(self, '_rate_limiter', global_rate_limiter)
+            object.__setattr__(self, '_robots_checker', robots_checker)
+            
+        except ImportError as e:
+            # Fallback si algunos módulos no están disponibles
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Some WebSearchTool components not available: {e}")
+            
+            # Crear mocks básicos para compatibilidad
+            object.__setattr__(self, '_config', None)
+            object.__setattr__(self, '_search_manager', None)
+            object.__setattr__(self, '_content_extractor', None)
+            object.__setattr__(self, '_rate_limiter', None)
+            object.__setattr__(self, '_robots_checker', None)
     
     @property
     def config(self):
         """Acceso al config"""
-        return self._config
+        return getattr(self, '_config', None)
     
     @property
     def search_manager(self):
-        """Acceso al search manager"""
-        return self._search_manager
+        """Acceso al search manager"""  
+        return getattr(self, '_search_manager', None)
     
     @property
     def content_extractor(self):
         """Acceso al content extractor"""
-        return self._content_extractor
+        return getattr(self, '_content_extractor', None)
     
     @property
     def rate_limiter(self):
         """Acceso al rate limiter"""
-        return self._rate_limiter
+        return getattr(self, '_rate_limiter', None)
     
     @property
     def robots_checker(self):
         """Acceso al robots checker"""
-        return self._robots_checker
+        return getattr(self, '_robots_checker', None)
     
     @property
     def stats(self):
         """Acceso a estadísticas"""
-        return self._stats
+        return getattr(self, '_stats', {})
     
     async def _arun(self, query: str, **kwargs) -> str:
         """Implementación principal del tool de búsqueda web"""
@@ -239,6 +246,45 @@ class WebSearchTool(BaseTool):
         except Exception as e:
             logger.error(f"Error in web search tool: {e}")
             return self._format_error_response(f"Search failed: {str(e)}")
+        
+        
+    def _run(self, query: str, **kwargs) -> str:
+        """
+        Versión síncrona del método _arun requerida por LangChain
+        
+        Args:
+            query: Search query string
+            **kwargs: Additional search parameters
+            
+        Returns:
+            str: Formatted search results
+        """
+        try:
+            # Ejecutar la versión async de forma síncrona
+            import asyncio
+            
+            # Verificar si hay un event loop corriendo
+            try:
+                loop = asyncio.get_running_loop()
+                # Si hay loop corriendo, ejecutar en thread separado
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, self._arun(query, **kwargs))
+                    return future.result(timeout=120)  # 2 minutos timeout
+                    
+            except RuntimeError:
+                # No hay loop corriendo, crear uno nuevo
+                return asyncio.run(self._arun(query, **kwargs))
+                
+        except asyncio.TimeoutError:
+            logger.error(f"Web search timeout for query: {query}")
+            return self._format_error_response("Search timeout - query took too long to complete")
+            
+        except Exception as e:
+            logger.error(f"Error in synchronous web search: {e}")
+            return self._format_error_response(f"Search failed: {str(e)}")    
+        
+        
     
     def _parse_search_request(self, query: str, kwargs: Dict[str, Any]) -> WebSearchRequest:
         """Parsear request de búsqueda desde argumentos del tool"""

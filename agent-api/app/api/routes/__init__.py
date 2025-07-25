@@ -1,12 +1,8 @@
-
-# ===============================================
-# agent-api/app/api/routes/__init__.py (actualizado)
-# ===============================================
 """
-API Routes Module
-FastAPI route definitions
+API Routes Package
+Solo importar lo que existe para evitar errores circulares
 """
 
-from . import health, research, upload
+from . import research
 
-__all__ = ["health", "research", "upload"]
+__all__ = ["research"]
