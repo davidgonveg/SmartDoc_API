@@ -1,4 +1,4 @@
-# Actualizar: agent-api/app/api/routes/research.py
+# agent-api/app/api/routes/research.py
 """Research endpoints con agente real"""
 
 from fastapi import APIRouter, HTTPException
@@ -16,6 +16,8 @@ settings = get_settings()
 
 # Almacén global de agentes (en producción usar Redis)
 active_agents: Dict[str, SmartDocAgent] = {}
+# NUEVO: Mapeo de session_id API -> research_session_id interno
+session_mapping: Dict[str, str] = {}
 
 class ResearchRequest(BaseModel):
     topic: str
@@ -32,7 +34,7 @@ async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
     """Crear una nueva sesión de investigación"""
     
     try:
-        session_id = str(uuid.uuid4())
+        api_session_id = str(uuid.uuid4())
         
         # Crear y inicializar agente
         agent = SmartDocAgent(
@@ -41,23 +43,22 @@ async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
         )
         
         initialized = await agent.initialize()
-        
-        # Crear research session CRÍTICO
-        research_session_id = await agent.create_research_session(request.topic, request.objectives)
-        
-        # Guardar agente
-        active_agents[session_id] = agent
-        
         if not initialized:
             raise HTTPException(status_code=500, detail="Error inicializando agente")
         
-        # Guardar agente
-        active_agents[session_id] = agent
+        # 🔧 CRÍTICO: Crear research session INTERNO del agente
+        research_session_id = await agent.create_research_session(request.topic, request.objectives)
         
-        logger.info(f"Sesión creada: {session_id} para tópico: {request.topic}")
+        # 📝 GUARDAR MAPEO: API session -> Research session
+        active_agents[api_session_id] = agent
+        session_mapping[api_session_id] = research_session_id
+        
+        logger.info(f"✅ API Session creada: {api_session_id}")
+        logger.info(f"✅ Research session interna: {research_session_id}")
+        logger.info(f"✅ Agente inicializado para tópico: {request.topic}")
         
         return {
-            "session_id": session_id,
+            "session_id": api_session_id,  # ID para el cliente
             "status": "created",
             "topic": request.topic,
             "model": settings.default_model
@@ -78,10 +79,19 @@ async def chat_with_agent(session_id: str, message: ChatMessage) -> Dict[str, An
         
         agent = active_agents[session_id]
         
-        # Procesar mensaje
-        result = await agent.process_query(message.message, session_id)
+        # 🔧 CRÍTICO: Usar el research_session_id interno del agente
+        research_session_id = session_mapping.get(session_id)
+        if not research_session_id:
+            # Si no hay mapping, usar la primera sesión activa del agente
+            if agent.active_sessions:
+                research_session_id = list(agent.active_sessions.keys())[0]
+            else:
+                raise HTTPException(status_code=404, detail="No hay sesiones de investigación activas")
         
-        logger.info(f"Respuesta generada para sesión {session_id}")
+        # ✅ CORRECTO: usar research_session_id interno + mensaje
+        result = await agent.process_query(research_session_id, message.message)
+        
+        logger.info(f"Respuesta generada para API session {session_id} -> research session {research_session_id}")
         
         return result
         
@@ -96,5 +106,6 @@ async def list_active_sessions() -> Dict[str, Any]:
     """Listar sesiones activas"""
     return {
         "active_sessions": list(active_agents.keys()),
-        "count": len(active_agents)
+        "count": len(active_agents),
+        "session_mappings": session_mapping
     }
