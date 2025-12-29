@@ -39,3 +39,43 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Virtual environments
+venv/
+venv-*/
+env/
+ENV/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE and backup files
+*.backup
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/

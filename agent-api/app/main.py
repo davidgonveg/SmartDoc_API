@@ -1,73 +1,114 @@
 """
-SmartDoc Agent API - Main FastAPI Application
+SmartDoc Agent API - Versión con LangChain Real
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 import logging
-from typing import Dict, Any
 
-from app.config.settings import get_settings
-from app.api.routes import research, health, upload
-from app.utils.logging_config import setup_logging
+# IMPORT DIRECTO DEL ROUTER (evita imports circulares)
+from app.api.routes.research import router as research_router
 
-# Setup logging
-setup_logging()
+# Setup logging básico
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-settings = get_settings()
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application startup and shutdown events"""
-    # Startup
-    logger.info("🚀 Starting SmartDoc Agent API")
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"GPU Support: {settings.use_gpu}")
-    
-    # Initialize services here
-    # await initialize_agent()
-    # await initialize_databases()
-    
-    yield
-    
-    # Shutdown
-    logger.info("🛑 Shutting down SmartDoc Agent API")
 
 # Create FastAPI app
 app = FastAPI(
     title="SmartDoc Agent API",
-    description="Intelligent research agent powered by LangChain",
+    description="Intelligent research agent with LangChain",
     version="0.1.0",
-    docs_url="/docs" if settings.environment != "production" else None,
-    redoc_url="/redoc" if settings.environment != "production" else None,
-    lifespan=lifespan
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8501"],  # Streamlit UI
+    allow_origins=["http://localhost:8501"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(health.router, prefix="/health", tags=["health"])
-app.include_router(research.router, prefix="/research", tags=["research"])
-app.include_router(upload.router, prefix="/upload", tags=["upload"])
+# INCLUIR RUTAS REALES DE LANGCHAIN (eliminar endpoints duplicados de main.py)
+app.include_router(research_router, prefix="/research", tags=["research"])
 
 @app.get("/")
-async def root() -> Dict[str, Any]:
+async def root():
     """Root endpoint"""
     return {
-        "message": "SmartDoc Agent API",
+        "message": "SmartDoc Agent API with LangChain",
         "version": "0.1.0",
         "status": "running",
         "docs": "/docs",
-        "gpu_enabled": settings.use_gpu
+        "langchain_enabled": True
+    }
+
+@app.get("/health")
+async def health_check():
+    """Health check"""
+    return {
+        "status": "healthy",
+        "service": "smartdoc-agent-api",
+        "version": "0.1.0",
+        "langchain": "enabled"
+    }
+
+@app.get("/test-ollama")
+async def test_ollama_connection():
+    """Test endpoint para verificar conexión Ollama"""
+    try:
+        from app.services.ollama_client import get_ollama_client
+        
+        client = await get_ollama_client()
+        is_healthy = await client.health_check()
+        
+        if is_healthy:
+            # Test basic generation
+            result = await client.generate(
+                model="llama3.2:3b", 
+                prompt="Say hello in one sentence.",
+                options={"num_predict": 50}
+            )
+            
+            if result["success"]:
+                return {
+                    "status": "connected",
+                    "ollama_healthy": True,
+                    "model_test": "success",
+                    "test_response": result["response"],
+                    "model_used": result.get("model", "unknown")
+                }
+            else:
+                return {
+                    "status": "connected_but_generation_failed",
+                    "ollama_healthy": True,
+                    "model_test": "failed",
+                    "error": result.get("error", "Unknown error")
+                }
+        else:
+            return {
+                "status": "connection_failed",
+                "ollama_healthy": False,
+                "error": "Ollama health check failed"
+            }
+            
+    except Exception as e:
+        logger.error(f"Ollama test failed: {e}")
+        return {
+            "status": "error",
+            "ollama_healthy": False,
+            "error": str(e)
+        }
+
+@app.post("/upload/{session_id}")
+async def upload_files(session_id: str):
+    """Upload files placeholder"""
+    return {
+        "session_id": session_id,
+        "message": "Upload functionality - coming soon",
+        "status": "placeholder"
     }
 
 if __name__ == "__main__":

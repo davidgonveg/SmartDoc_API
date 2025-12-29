@@ -1,7 +1,7 @@
-version: '3.8'
+# docker-compose.yml - CORREGIDO basado en estructura original
 
 services:
-  # Redis for caching and session storage
+  # Redis for caching and session storage - OPTIMIZADO
   redis:
     image: redis:7-alpine
     container_name: smartdoc-redis
@@ -9,10 +9,16 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy allkeys-lru
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
 
-  # ChromaDB for vector storage
+  # ChromaDB for vector storage - OPTIMIZADO
   chromadb:
     image: chromadb/chroma:latest
     container_name: smartdoc-chromadb
@@ -23,9 +29,38 @@ services:
     environment:
       - CHROMA_SERVER_HOST=0.0.0.0
       - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_GRPC_PORT=50051
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=["*"]
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
 
-  # Agent API (FastAPI + LangChain)
+  # Ollama LLM Service - AGREGADO Y OPTIMIZADO
+  ollama:
+    image: ollama/ollama:latest
+    container_name: smartdoc-ollama
+    ports:
+      - "11434:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=5m
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 2G
+
+  # Agent API (FastAPI + LangChain) - OPTIMIZADO
   agent-api:
     build: 
       context: ./agent-api
@@ -38,22 +73,58 @@ services:
       - ./data/reports:/app/reports
       - ./logs/agent:/app/logs
     environment:
+      # Configuración original
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - CHROMADB_HOST=chromadb
       - CHROMADB_PORT=8000
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - OLLAMA_HOST=${OLLAMA_HOST:-host.docker.internal}
-      - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+      - OLLAMA_HOST=ollama  # ← CAMBIADO: ahora usa el servicio ollama
+      - OLLAMA_PORT=11434
+      
+      # 🚀 NUEVOS: Parámetros LLM optimizados
+      - LLM_TEMPERATURE=0.7
+      - LLM_TOP_P=0.9
+      - LLM_NUM_CTX=8192
+      - LLM_NUM_PREDICT=1024
+      - LLM_TIMEOUT=300
+      
+      # 🚀 NUEVOS: Configuración del agente
+      - AGENT_MAX_ITERATIONS=15
+      - AGENT_OPTIMIZATION_LEVEL=balanced
+      - AGENT_ENABLE_STREAMING=true
+      - AGENT_MAX_EXECUTION_TIME=300
+      
+      # 🚀 NUEVOS: Configuración de memoria
+      - MEMORY_WINDOW_SIZE=10
+      - MEMORY_MAX_STORED_STEPS=50
+      
+      # 🚀 NUEVOS: Configuración de herramientas
+      - WEB_SEARCH_TIMEOUT=30
+      - WEB_SEARCH_MAX_RESULTS=10
+      - WEB_SEARCH_RATE_LIMIT=5
+      
+      # 🚀 NUEVOS: Performance settings
+      - ENABLE_GPU=true
+      - MAX_CONCURRENT_SESSIONS=10
+      - CACHE_TTL=3600
+      - DEFAULT_MODEL=llama3.2:3b
     depends_on:
       - redis
       - chromadb
+      - ollama  # ← AGREGADO: depende de ollama
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
-  # Streamlit UI
+  # Streamlit UI - MANTENIDO ORIGINAL
   streamlit-ui:
     build:
-      context: ./streamlit-ui
+      context: ./streamlit-ui  # ← CORRECTO: tu directorio real
       dockerfile: Dockerfile
     container_name: smartdoc-streamlit-ui
     ports:
@@ -63,13 +134,21 @@ services:
       - ./data/reports:/app/reports
     environment:
       - AGENT_API_URL=http://agent-api:8001
+      - STREAMLIT_THEME=dark
+      - STREAMLIT_SERVER_MAX_UPLOAD_SIZE=200
+      - STREAMLIT_SERVER_ENABLE_CORS=true
+      - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
     depends_on:
       - agent-api
     restart: unless-stopped
 
 volumes:
   redis_data:
+    driver: local
   chromadb_data:
+    driver: local
+  ollama_data:    # ← AGREGADO: volumen para ollama
+    driver: local
 
 networks:
   default:
