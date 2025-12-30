@@ -2,8 +2,8 @@
 echo "📊 Ejecutando benchmark de SmartDoc Agent..."
 
 # Verificar API
-if ! curl -s http://localhost:8001/health > /dev/null; then
-    echo "❌ API no está disponible en localhost:8001"
+if ! curl -s http://localhost:8002/health > /dev/null; then
+    echo "❌ API no está disponible en localhost:8002"
     echo "💡 Ejecuta primero: ./scripts/start-optimized.sh"
     exit 1
 fi
@@ -12,7 +12,7 @@ echo "✅ API disponible - Iniciando benchmark..."
 
 # Crear sesión de test
 echo "🔧 Creando sesión de benchmark..."
-SESSION_RESPONSE=$(curl -s -X POST http://localhost:8001/research/session \
+SESSION_RESPONSE=$(curl -s -X POST http://localhost:8002/research/session \
     -H "Content-Type: application/json" \
     -d '{"topic":"benchmark test","objectives":["performance testing"],"optimization_level":"balanced"}')
 
@@ -48,7 +48,7 @@ for query_data in "${test_queries[@]}"; do
     
     start_time=$(date +%s.%3N)
     
-    response=$(curl -s -X POST http://localhost:8001/research/chat/$SESSION_ID \
+    response=$(curl -s -X POST http://localhost:8002/research/chat/$SESSION_ID \
         -H "Content-Type: application/json" \
         -d "{\"message\":\"$query\",\"depth\":\"$depth\"}")
     
@@ -84,12 +84,12 @@ done
 # Información del sistema
 echo ""
 echo "🖥️ Información del hardware:"
-curl -s http://localhost:8001/system/hardware | jq .
+curl -s http://localhost:8002/system/hardware | jq .
 
 # Métricas finales de la sesión
 echo ""
 echo "📈 Métricas finales de la sesión:"
-curl -s http://localhost:8001/research/session/$SESSION_ID/performance | jq .
+curl -s http://localhost:8002/research/session/$SESSION_ID/performance | jq .
 
 echo ""
 echo "📊 Benchmark completado exitosamente!"

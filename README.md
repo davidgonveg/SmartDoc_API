@@ -1,6 +1,6 @@
 # SmartDoc Research Agent
 
-> **Estado Actual: Base Funcional ✅ | Agente LangChain: En Desarrollo 🚧**
+> **Estado Actual: Beta Funcional (v0.2) 🚀 | Agente LangChain + Web Search Integrado ✅**
 
 Agente de investigación inteligente powered by LangChain que puede investigar cualquier tema usando múltiples fuentes (web scraping, PDFs, cálculos), sintetizar información y generar reportes estructurados. Diseñado para funcionar completamente en local con Docker y aprovechar GPUs para modelos locales.
 
@@ -23,7 +23,7 @@ Desarrollar un **agente de IA autónomo** que pueda:
 
 #### 🏗️ Infraestructura
 - [x] **Docker Compose** multi-servicio configurado
-- [x] **FastAPI backend** (puerto 8001) con endpoints funcionales
+- [x] **FastAPI backend** (puerto 8002) con endpoints funcionales
 - [x] **Streamlit frontend** (puerto 8501) con UI básica
 - [x] **ChromaDB** (puerto 8000) para vectores y RAG
 - [x] **Redis** (puerto 6379) para cache y sesiones
@@ -58,41 +58,23 @@ Desarrollar un **agente de IA autónomo** que pueda:
 - [x] **Volume persistence** para datos
 - [x] **Network** configuration
 
-### 🚧 EN DESARROLLO (v0.2 - Agente LangChain)
+### ✅ COMPLETADO (v0.2 - Agente Avanzado)
 
-#### 🤖 Agent Core (Próximo)
-- [ ] **LangChain Agent** con patrón ReAct
-- [ ] **Conexión Ollama** para LLM real
-- [ ] **Planning Module** para descomponer tareas
-- [ ] **Tool Orchestrator** para decidir herramientas
-- [ ] **Memory System** working/long-term memory
-- [ ] **Validation Layer** para verificar resultados
+#### 🤖 Agent Core (Implementado)
+- [x] **LangChain Agent** con patrón ReAct (SmartDocAgent)
+- [x] **Conexión Ollama** para LLM real (ChatOllama)
+- [x] **Tool Orchestrator** funcional
+- [x] **Memory System** (WindowBufferMemory)
+- [x] **Optimization** (CPU/GPU auto-detection)
 
 #### 🛠️ Tools System
-- [ ] **Web Search Tool** (requests + BeautifulSoup)
+- [x] **Web Search Tool** (DuckDuckGo + Fallbacks)
   - Búsqueda inteligente en internet
   - Rate limiting y respeto robots.txt
   - Extracción de contenido principal
-- [ ] **PDF Reader Tool** 
-  - Procesamiento de PDFs subidos
-  - Búsqueda semántica en documentos
-  - Extracción de texto estructurado
-- [ ] **Calculator Tool**
-  - Cálculos matemáticos complejos
-  - Análisis estadístico con pandas
-  - Visualizaciones con matplotlib
-- [ ] **Code Executor Tool**
-  - Ejecución segura de Python
-  - Generación de gráficos
-  - Análisis de datos
-- [ ] **Memory Store Tool**  
-  - ChromaDB integration
-  - Semantic retrieval
-  - Cross-session persistence
-- [ ] **Report Generator Tool**
-  - Templates personalizables
-  - Múltiples formatos (MD, HTML, PDF)
-  - Executive/Academic/Technical styles
+- [ ] **PDF Reader Tool** (Pendiente)
+- [ ] **Calculator Tool** (Pendiente)
+- [ ] **Code Executor Tool** (Pendiente)
 
 ### 🚀 ROADMAP (v0.3+ - Features Avanzadas)
 
@@ -150,8 +132,8 @@ cd smartdoc-research-agent
 
 ### Acceso
 - **🎨 UI**: http://localhost:8501
-- **🚀 API**: http://localhost:8001  
-- **📚 Docs**: http://localhost:8001/docs
+- **🚀 API**: http://localhost:8002  
+- **📚 Docs**: http://localhost:8002/docs
 - **🗄️ ChromaDB**: http://localhost:8000
 - **🤖 Ollama**: http://localhost:11434
 
@@ -159,15 +141,15 @@ cd smartdoc-research-agent
 
 ```bash
 # Health check
-curl http://localhost:8001/health
+curl http://localhost:8002/health
 
 # Crear sesión
-curl -X POST http://localhost:8001/research/session \
+curl -X POST http://localhost:8002/research/session \
   -H "Content-Type: application/json" \
   -d '{"topic": "inteligencia artificial", "objectives": ["aplicaciones actuales"]}'
 
 # Chat básico (usa el session_id del paso anterior)
-curl -X POST http://localhost:8001/research/chat/SESSION_ID \
+curl -X POST http://localhost:8002/research/chat/SESSION_ID \
   -H "Content-Type: application/json" \
   -d '{"message": "Hola, cuéntame sobre IA"}'
 ```
@@ -177,7 +159,7 @@ curl -X POST http://localhost:8001/research/chat/SESSION_ID \
 ```mermaid
 graph TB
     User[👤 Usuario] -->|Chat| UI[🎨 Streamlit :8501]
-    UI -->|HTTP API| API[🚀 FastAPI :8001]
+    UI -->|HTTP API| API[🚀 FastAPI :8002]
     API -->|ReAct Agent| LC[🧠 LangChain Agent]
     LC -->|LLM Calls| OL[🤖 Ollama :11434]
     LC -->|Tools| TOOLS[🛠️ Tools Suite]
@@ -197,7 +179,7 @@ graph TB
 | Servicio | Puerto | Función | Estado |
 |----------|--------|---------|--------|
 | **Streamlit UI** | 8501 | Interfaz de usuario web | ✅ Funcional |
-| **FastAPI API** | 8001 | Backend del agente + endpoints | ✅ Funcional |
+| **FastAPI API** | 8002 | Backend del agente + endpoints | ✅ Funcional |
 | **Ollama** | 11434 | Motor de LLMs locales | ✅ Configurado |
 | **ChromaDB** | 8000 | Base de datos vectorial | ✅ Configurado |
 | **Redis** | 6379 | Cache y gestión de sesiones | ✅ Configurado |
@@ -269,12 +251,12 @@ docker-compose up -d
 
 ```bash
 # Health checks
-curl http://localhost:8001/health
+curl http://localhost:8002/health
 curl http://localhost:8501/_stcore/health
 
 # API testing
-curl http://localhost:8001/docs  # OpenAPI docs
-curl http://localhost:8001/research/sessions
+curl http://localhost:8002/docs  # OpenAPI docs
+curl http://localhost:8002/research/sessions
 
 # Ollama testing
 curl http://localhost:11434/api/version
@@ -293,10 +275,16 @@ ollama list  # Ver modelos instalados
 
 ### Problemas Comunes
 
-**Puerto 8001 no responde:**
+**Puerto 8002 no responde:**
 ```bash
 docker logs smartdoc-agent-api
 # Verificar errores de Python/imports
+```
+
+**Problemas de Dependencias (ImportError):**
+Si encuentras errores como `ImportError: cannot import name 'AgentExecutor'`, asegúrate de tener las versiones correctas instaladas:
+```bash
+pip install langchain==0.2.16 langchain-community==0.2.16 langchain-ollama==0.1.3
 ```
 
 **Ollama no conecta:**

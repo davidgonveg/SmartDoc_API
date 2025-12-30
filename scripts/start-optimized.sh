@@ -55,7 +55,7 @@ sleep 15
 
 # Health check
 for i in {1..30}; do
-    if curl -s http://localhost:8001/health > /dev/null; then
+    if curl -s http://localhost:8002/health > /dev/null; then
         echo "✅ API lista"
         break
     fi
@@ -66,5 +66,5 @@ done
 echo ""
 echo "🎉 SmartDoc Agent iniciado exitosamente!"
 echo "🌐 UI: http://localhost:8501"
-echo "🚀 API: http://localhost:8001"
-echo "📚 Docs: http://localhost:8001/docs"
+echo "🚀 API: http://localhost:8002"
+echo "📚 Docs: http://localhost:8002/docs"

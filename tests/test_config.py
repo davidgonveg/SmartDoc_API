@@ -36,7 +36,7 @@ class TestServiceConfig:
     """Configuración para servicios en testing"""
     
     # FastAPI
-    api_base_url: str = "http://localhost:8001"
+    api_base_url: str = "http://localhost:8002"
     api_timeout: int = 30
     
     # Streamlit  

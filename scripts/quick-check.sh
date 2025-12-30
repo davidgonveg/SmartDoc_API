@@ -9,10 +9,10 @@ echo ""
 echo "🩺 Health checks:"
 
 # API Health
-if curl -s http://localhost:8001/health > /dev/null; then
-    echo "✅ API (8001) - OK"
+if curl -s http://localhost:8002/health > /dev/null; then
+    echo "✅ API (8002) - OK"
 else
-    echo "❌ API (8001) - FAIL"
+    echo "❌ API (8002) - FAIL"
 fi
 
 # UI Check
@@ -45,10 +45,10 @@ fi
 
 echo ""
 echo "📊 Hardware info:"
-curl -s http://localhost:8001/research/system/hardware 2>/dev/null | jq -r '{cpu_count, memory_gb, has_gpu, recommended_optimization}' 2>/dev/null || echo "API no disponible"
+curl -s http://localhost:8002/research/system/hardware 2>/dev/null | jq -r '{cpu_count, memory_gb, has_gpu, recommended_optimization}' 2>/dev/null || echo "API no disponible"
 
 echo ""
 echo "🔗 Accesos:"
 echo "   UI: http://localhost:8501"
-echo "   API: http://localhost:8001"
-echo "   Docs: http://localhost:8001/docs"
+echo "   API: http://localhost:8002"
+echo "   Docs: http://localhost:8002/docs"

@@ -215,14 +215,14 @@ async def test_4_api_integration():
         # Test API health
         async with httpx.AsyncClient() as client:
             try:
-                response = await client.get("http://localhost:8001/health", timeout=10.0)
+                response = await client.get("http://localhost:8002/health", timeout=10.0)
                 api_healthy = response.status_code == 200
                 print_test_result("API health check", api_healthy)
                 
                 if api_healthy:
                     # Test session creation
                     session_response = await client.post(
-                        "http://localhost:8001/research/session",
+                        "http://localhost:8002/research/session",
                         json={"research_style": "general"}
                     )
                     
@@ -235,7 +235,7 @@ async def test_4_api_integration():
                         
                         # Test chat endpoint
                         chat_response = await client.post(
-                            f"http://localhost:8001/research/chat/{session_id}",
+                            f"http://localhost:8002/research/chat/{session_id}",
                             json={"message": "What is Python programming?"},
                             timeout=60.0
                         )

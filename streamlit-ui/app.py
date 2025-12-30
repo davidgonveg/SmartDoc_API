@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # API Configuration
-API_BASE_URL = os.getenv("AGENT_API_URL", "http://localhost:8001")
+API_BASE_URL = os.getenv("AGENT_API_URL", "http://localhost:8002")
 
 def main():
     st.title("🔬 SmartDoc Research Agent")

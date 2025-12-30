@@ -79,11 +79,11 @@ E2E_TEST_CONFIG = {
 
 # URLs para tests E2E
 E2E_ENDPOINTS = {
-    "api_base": "http://localhost:8001",
+    "api_base": "http://localhost:8002",
     "ui_base": "http://localhost:8501",
-    "health_check": "http://localhost:8001/health",
-    "api_docs": "http://localhost:8001/docs",
-    "metrics": "http://localhost:8001/metrics"
+    "health_check": "http://localhost:8002/health",
+    "api_docs": "http://localhost:8002/docs",
+    "metrics": "http://localhost:8002/metrics"
 }
 
 # Logger específico para tests E2E

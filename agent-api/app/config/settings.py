@@ -1,14 +1,9 @@
 # app/config/settings.py - PARÁMETROS OPTIMIZADOS
 
-<<<<<<< HEAD
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from typing import Optional
-import os
-=======
-from pydantic_settings import BaseSettings
 from typing import Optional, Dict, Any
->>>>>>> 6c454ad3e4eb18b9c07646a44fc47615aaba7690
+import os
 
 class Settings(BaseSettings):
     """Configuración optimizada para SmartDoc Agent"""

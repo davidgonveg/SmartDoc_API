@@ -67,7 +67,7 @@ services:
       dockerfile: Dockerfile
     container_name: smartdoc-agent-api
     ports:
-      - "8001:8001"
+      - "8002:8001"
     volumes:
       - ./data/uploads:/app/uploads
       - ./data/reports:/app/reports
