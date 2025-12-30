@@ -8,6 +8,7 @@ import asyncio
 import logging
 import json
 import uuid
+import traceback
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 
@@ -203,6 +204,7 @@ class SmartDocAgent:
             
         except Exception as e:
             logger.error(f"❌ Error inicializando SmartDocAgent: {e}")
+            traceback.print_exc()
             return False
         
         
@@ -279,6 +281,7 @@ class SmartDocAgent:
             
         except Exception as e:
             logger.error(f"❌ Error configurando LLM: {e}")
+            traceback.print_exc()
             raise
 
     async def _setup_tools_real(self):
@@ -294,6 +297,7 @@ class SmartDocAgent:
                 
         except Exception as e:
             logger.error(f"❌ Error configurando herramientas: {e}")
+            traceback.print_exc()
             raise
 
     async def _create_langchain_agent(self):
@@ -326,6 +330,7 @@ class SmartDocAgent:
             
         except Exception as e:
             logger.error(f"❌ Error creando AgentExecutor: {e}")
+            traceback.print_exc()
             raise
     
     async def _setup_llm(self):

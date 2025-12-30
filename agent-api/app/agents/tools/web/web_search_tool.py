@@ -52,6 +52,9 @@ class WebSearchTool(BaseTool):
     Input should be a search query string.
     Returns search results with titles, URLs, and snippets."""
     
+    class Config:
+        extra = "allow"
+    
     def __init__(self, **kwargs):
         # Llamar al __init__ de BaseTool primero
         super().__init__(**kwargs)

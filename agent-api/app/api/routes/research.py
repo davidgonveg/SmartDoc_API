@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 import uuid
 import logging
+import traceback
 
 from app.agents.core.smart_agent import SmartDocAgent
 from app.config.settings import get_settings
@@ -83,6 +84,7 @@ async def create_research_session(request: ResearchRequest) -> Dict[str, Any]:
         
     except Exception as e:
         logger.error(f"❌ Error creando sesión optimizada: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chat/{session_id}")
@@ -114,6 +116,7 @@ async def chat_with_agent(session_id: str, message: ChatMessage) -> Dict[str, An
         
     except Exception as e:
         logger.error(f"❌ Error en chat optimizado: {e}")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 # 🚀 NUEVOS ENDPOINTS DE OPTIMIZACIÓN
